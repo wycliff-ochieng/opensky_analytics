@@ -19,7 +19,7 @@ def create_kafka_producer():
     for i in range(retries):
         try:
             producer = KafkaProducer(
-                bootstrap_servers=['localhost:9092'],
+                bootstrap_servers=[KAFKA_BROKER],
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
             )
             _logger.info("successfully created a kafka producer")
@@ -43,6 +43,7 @@ def fetch_flight_data():
 def process_and_send(producer, data):
     if not data or 'states' not in data or data['states'] is None:
         _logger.warning("No flight data received.")
+        producer.flush()
         return
 
     columns = [
@@ -52,8 +53,14 @@ def process_and_send(producer, data):
         "spi", "position_source"
     ]
 
+    sent_count = 0
     for state in data['states']:
         try:
+            # Skip malformed flights that don't have enough columns
+            if len(state) < len(columns):
+                _logger.warning(f"Skipping malformed flight with {len(state)} columns instead of {len(columns)}")
+                continue
+                
             # Create a dictionary for the flight
             flight_data = dict(zip(columns, state))
             
@@ -62,11 +69,12 @@ def process_and_send(producer, data):
 
             # Send to Kafka
             producer.send(KAFKA_TOPIC, value=flight_data)
+            sent_count += 1
         except Exception as e:
             _logger.error(f"Failed to process/send flight: {e}")
     
     producer.flush()
-    _logger.info(f"Sent {len(data['states'])} flights to Kafka.")
+    _logger.info(f"Sent {sent_count} flights to Kafka.")
 
 
 def main():
