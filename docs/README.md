@@ -5,9 +5,10 @@ Complete reference for the OpenSky Analytics data pipeline project.
 ## 📚 Documentation Index
 
 ### Project Overview
-- **[ROOT: engineering log.md](../engineering%20log.md)** - Development timeline, decisions, and checkpoints
-- **[ROOT: concepts.md](../concepts.md)** - Key data engineering concepts and architecture patterns
-- **[ROOT: postmortem.md](../postmortem.md)** - Issues encountered, root causes, and fixes applied
+- **[engineering_log.md](./engineering_log.md)** - Development timeline, decisions, and checkpoints
+- **[concepts.md](./concepts.md)** - Key data engineering concepts and architecture patterns
+- **[postmortem.md](./postmortem.md)** - Issues encountered, root causes, and fixes applied
+- **[architecture.md](./architecture.md)** - Kafka/Spark runtime architecture, job inventory, and function wiring
 
 ### Infrastructure & Deployment
 - **[INFRASTRUCTURE_SETUP.md](./INFRASTRUCTURE_SETUP.md)** ⭐ **START HERE**
@@ -88,6 +89,15 @@ Kafka Topic: flights_processed
 Client
 ```
 
+Runtime jobs:
+1. Ingestion producer (`ingestion_layer/ingest.py`)
+2. Spark streaming processor (`processing_layer/process_flights.py`)
+3. PostgreSQL sink consumer (`processing_layer/sink_to_db.py`)
+
+The Go backend is the serving layer, not a stream job.
+
+For the full function-by-function wiring, see [architecture.md](./architecture.md).
+
 ---
 
 ## 🛠️ Stack Components
@@ -118,10 +128,10 @@ Client
 - Payload normalization
 
 ### Processing Layer (`processing_layer/test_process_flights.py`)
-- 2 schema validation tests passing
-- 11 Spark integration tests pending (require Java)
+- Schema tests validate the Spark event shape
+- Integration checks run against the Spark container and Kafka topic path
 
-**Total: 24/26 tests passing**
+**Status: ingestion and sink unit coverage complete; Spark processing is container-based**
 
 ---
 
@@ -190,8 +200,8 @@ WebUI: http://localhost:8080
 
 1. **For infrastructure issues**: See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 2. **For setup questions**: See [INFRASTRUCTURE_SETUP.md](./INFRASTRUCTURE_SETUP.md)
-3. **For context & history**: See [../engineering log.md](../engineering%20log.md)
-4. **For root causes**: See [../postmortem.md](../postmortem.md)
+3. **For context & history**: See [engineering_log.md](./engineering_log.md)
+4. **For root causes**: See [postmortem.md](./postmortem.md)
 
 ---
 
@@ -199,7 +209,7 @@ WebUI: http://localhost:8080
 
 - **Kafka UI requires internal bootstrap server** (`kafka:29092` not `localhost:9092`)
 - **PostgreSQL data persists** in named volume `opensky_analytics_postgres_data`
-- **Spark cluster has bundled Java** - no local Java install needed
+- **Spark jobs run through containerized spark-submit** inside `spark-master`
 - **Tests cover ingestion & sink** - integration tests are in-process
 - **Docker Compose manages all services** - easier than manual container management
 
@@ -207,4 +217,4 @@ WebUI: http://localhost:8080
 
 Last Updated: **2026-05-02**  
 Phase: **1 - Core Pipeline Implementation**  
-Status: **Infrastructure Ready | Testing 92% | Spark Integration Pending**
+Status: **Infrastructure Ready | Stream Architecture Documented | Spark Running in Docker**

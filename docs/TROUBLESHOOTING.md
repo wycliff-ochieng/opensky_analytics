@@ -303,7 +303,7 @@ curl -s http://localhost:8081 | head -20
 
 ### Problem: PySpark Cannot Connect to Spark Cluster
 
-**Symptoms**: `PySparkRuntimeError` when creating SparkSession
+**Symptoms**: `PySparkRuntimeError` when creating SparkSession, `JAVA_HOME is not set`, or `JAVA_GATEWAY_EXITED`
 
 **Diagnosis**:
 ```bash
@@ -328,7 +328,7 @@ EOF
 |----------|-------|-----|
 | Local testing | Local Java not installed | Use Spark cluster via `master("spark://spark-master:7077")` or use Docker containers |
 | Docker container | Cluster unreachable | Verify cluster is running: `docker compose ps \| grep spark` |
-| PySpark command | `JAVA_GATEWAY_EXITED` | Install Java locally or use `spark-submit` |
+| PySpark command | `JAVA_GATEWAY_EXITED` | Do not run the job on the host; use `docker exec spark-master /opt/spark/bin/spark-submit ...` |
 
 **For Local Jobs**:
 ```bash
@@ -342,10 +342,12 @@ spark = SparkSession.builder \
 **For Production Jobs**:
 ```bash
 # Submit to cluster via spark-submit
-docker exec spark-master spark-submit \
+docker exec spark-master /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
-  --class your.main.Class \
-  /path/to/app.jar
+  --deploy-mode client \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  --conf spark.jars.ivy=/tmp/.ivy2 \
+  /opt/spark-apps/process_flights.py
 ```
 
 ## 5. Docker Compose Issues

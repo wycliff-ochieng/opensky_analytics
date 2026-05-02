@@ -144,6 +144,44 @@ CREATE INDEX flights_timestamp_idx ON flights_processed (timestamp DESC);
   - Determines flight status (CLIMBING/DESCENDING/CRUISING)
 - Writes to Kafka topic: `flights_processed`
 
+### Runtime Jobs and How They Connect
+
+| Job | File | Entry point | Reads | Writes |
+| --- | --- | --- | --- | --- |
+| Ingestion | `ingestion_layer/ingest.py` | `main()` | OpenSky API | Kafka `flights_raw` |
+| Stream processing | `processing_layer/process_flights.py` | module body via `spark-submit` | Kafka `flights_raw` | Kafka `flights_processed` |
+| Sink to DB | `processing_layer/sink_to_db.py` | `main()` | Kafka `flights_processed` | PostgreSQL `flights_processed` table |
+
+The Go backend is a query service. It reads PostgreSQL only; it does not consume Kafka.
+
+### Function Wiring
+
+- `ingestion_layer/ingest.py`
+  - `create_kafka_producer()` connects to Kafka with retries.
+  - `fetch_flight_data()` pulls one OpenSky snapshot.
+  - `process_and_send()` validates each aircraft state, adds `timestamp`, and publishes to `flights_raw`.
+  - `main()` is the infinite poll loop.
+- `processing_layer/process_flights.py`
+  - Builds a Spark session against `spark://spark-master:7077`.
+  - Reads `flights_raw` with `readStream`.
+  - Parses JSON, filters invalid coordinates, calculates `velocity_kmh`, and assigns `status`.
+  - Writes to `flights_processed` with checkpointing.
+- `processing_layer/sink_to_db.py`
+  - `create_consumer()` reads from `flights_processed`.
+  - `create_db_connection()` opens PostgreSQL with retry logic.
+  - `normalize()` maps Kafka payload fields into the SQL insert shape.
+  - `main()` commits each processed row into PostgreSQL.
+
+### Job Count
+
+There are 3 long-running runtime jobs in the pipeline:
+
+1. Ingestion producer.
+2. Spark streaming processor.
+3. PostgreSQL sink consumer.
+
+The backend API is not counted as a stream job because it only serves queries from the database.
+
 ## How to Start the Stack
 
 ### 1. Start All Services
@@ -215,6 +253,8 @@ HTTP_ADDR=0.0.0.0:8000
 4. **Querying**: Go backend API reads from PostgreSQL, serves HTTP `/flights` endpoint
 5. **Monitoring**: Kafka UI shows message flow, Spark UI shows job progress
 
+This pipeline has 3 runtime jobs and 1 serving service. See [architecture.md](./architecture.md) for the function-level wiring.
+
 ## Persistence
 
 - **PostgreSQL Volume**: `opensky_analytics_postgres_data` (stored on host)
@@ -251,7 +291,22 @@ docker logs kafka-ui                  # View Kafka UI startup
 ### Execute Commands in Containers
 ```bash
 docker exec -it postgres psql -U opensky -d opensky
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+docker exec -it kafka kafka-topics --list --bootstrap-server kafka:29092
+```
+
+### Submit the Spark Job
+```bash
+docker exec \
+  -e SPARK_MASTER=spark://spark-master:7077 \
+  -e KAFKA_BOOTSTRAP_SERVERS=kafka:29092 \
+  -e INPUT_TOPIC=flights_raw \
+  -e OUTPUT_TOPIC=flights_processed \
+  spark-master /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --deploy-mode client \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  --conf spark.jars.ivy=/tmp/.ivy2 \
+  /opt/spark-apps/process_flights.py
 ```
 
 ### Stop Stack

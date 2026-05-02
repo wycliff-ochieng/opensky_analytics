@@ -1,37 +1,29 @@
 # Running Spark Processing Jobs
 
-This guide explains how to run the Spark processing job (`process_flights.py`) that transforms raw flight data.
+This guide explains how to run the Spark processing job (`process_flights.py`) inside the Spark container so the host does not need Java.
 
 ## Quick Start
 
-### Option 1: Run from Host (Recommended)
-```bash
-cd /home/wyckie/Desktop/MyProjects/opensky_analytics
-source venv/bin/activate
-
-# Set environment variables
-export SPARK_MASTER="spark://spark-master:7077"
-export KAFKA_BOOTSTRAP_SERVERS="kafka:29092"
-
-# Run the Spark job
-python processing_layer/process_flights.py
-```
-
-### Option 2: Run via Shell Script
+### Option 1: Run via Shell Script
 ```bash
 cd /home/wyckie/Desktop/MyProjects/opensky_analytics
 ./run_spark_job.sh cluster
 ```
 
-### Option 3: Run Locally (No Cluster Required)
+### Option 2: Run the Container Command Directly
 ```bash
 cd /home/wyckie/Desktop/MyProjects/opensky_analytics
-source venv/bin/activate
-
-export SPARK_MASTER="local[2]"
-export KAFKA_BOOTSTRAP_SERVERS="localhost:9092"
-
-python processing_layer/process_flights.py
+docker exec \
+  -e SPARK_MASTER=spark://spark-master:7077 \
+  -e KAFKA_BOOTSTRAP_SERVERS=kafka:29092 \
+  -e INPUT_TOPIC=flights_raw \
+  -e OUTPUT_TOPIC=flights_processed \
+  spark-master /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --deploy-mode client \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  --conf spark.jars.ivy=/tmp/.ivy2 \
+  /opt/spark-apps/process_flights.py
 ```
 
 ## Prerequisites
@@ -43,11 +35,9 @@ python processing_layer/process_flights.py
    # Should show: spark-master, spark-worker, kafka, postgres, zookeeper, kafka-ui
    ```
 
-2. **Python Environment with PySpark**:
-   ```bash
-   source venv/bin/activate
-   pip install pyspark kafka-python
-   ```
+2. **No Host Java Required**:
+  - Spark runs inside the `spark-master` container.
+  - Use `spark-submit` from Docker rather than `python processing_layer/process_flights.py` on the host.
 
 3. **Kafka Topics Exist** (auto-created by ingestion):
    - `flights_raw` - Input topic
@@ -57,7 +47,7 @@ python processing_layer/process_flights.py
 
 | Variable | Default | Cluster Value | Local Value | Description |
 |----------|---------|----------------|-------------|-------------|
-| `SPARK_MASTER` | `spark://spark-master:7077` | `spark://spark-master:7077` | `local[*]` | Spark cluster master URL |
+| `SPARK_MASTER` | `spark://spark-master:7077` | `spark://spark-master:7077` | `local[1]` | Spark cluster master URL |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | `kafka:29092` | `localhost:9092` | Kafka broker address |
 | `INPUT_TOPIC` | `flights_raw` | `flights_raw` | `flights_raw` | Read from this topic |
 | `OUTPUT_TOPIC` | `flights_processed` | `flights_processed` | `flights_processed` | Write to this topic |
@@ -127,6 +117,21 @@ curl -s http://localhost:8080 | head -20
 docker compose restart spark-master
 sleep 5
 docker compose restart spark-worker
+```
+
+### Problem: JAVA_HOME Is Not Set
+
+**Symptoms**: `JAVA_HOME is not set` or `PySparkRuntimeError: [JAVA_GATEWAY_EXITED]`
+
+**Root Cause**: Running the Spark application on the host instead of inside the Spark container.
+
+**Fix**:
+```bash
+# Do not run this on the host:
+# python processing_layer/process_flights.py
+
+# Use the containerized launcher instead:
+./run_spark_job.sh cluster
 ```
 
 ### Problem: Kafka Connection Refused
@@ -205,7 +210,7 @@ docker compose up -d
 
 # Increase Spark parallelism
 export SPARK_PARALLELISM=4
-python processing_layer/process_flights.py
+./run_spark_job.sh cluster
 
 # Increase Kafka partitions
 docker exec kafka kafka-topics --bootstrap-server kafka:29092 \
@@ -226,10 +231,7 @@ source venv/bin/activate
 python ingestion_layer/ingest.py
 
 # Terminal 3: Start processing (this window)
-source venv/bin/activate
-export SPARK_MASTER="spark://spark-master:7077"
-export KAFKA_BOOTSTRAP_SERVERS="kafka:29092"
-python processing_layer/process_flights.py
+./run_spark_job.sh cluster
 
 # Terminal 4: Start sink consumer
 source venv/bin/activate
@@ -248,6 +250,6 @@ This runs the complete end-to-end pipeline:
 
 ## Related Docs
 
-- [INFRASTRUCTURE_SETUP.md](./docs/INFRASTRUCTURE_SETUP.md) - Service configuration
-- [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) - Debugging commands
-- [README.md](./docs/README.md) - Project overview
+- [INFRASTRUCTURE_SETUP.md](./INFRASTRUCTURE_SETUP.md) - Service configuration
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Debugging commands
+- [README.md](./README.md) - Project overview

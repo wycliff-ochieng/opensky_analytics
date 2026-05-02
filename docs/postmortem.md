@@ -17,3 +17,12 @@
 - Root cause: Python compile and local Go build outputs.
 - Fix: Removed generated files immediately after checks.
 - Risk remaining: Runtime E2E data flow (Kafka -> Spark -> DB -> API) still unverified in a live stack.
+
+## 2026-05-02 - Stream Processing Follow-up
+- Issue: The Spark job was still being launched from the host in earlier attempts.
+- Root cause: Host PySpark depended on local Java, but this machine did not provide a usable Java runtime for `SparkSession`.
+- Fix: Run `processing_layer/process_flights.py` through `spark-submit` inside the `spark-master` container instead of the host Python interpreter.
+- Issue: Kafka UI originally loaded without showing cluster data.
+- Root cause: The UI was pointed at the wrong bootstrap address for Docker networking.
+- Fix: Use `kafka:29092` inside containers and `localhost:9092` only from the host.
+- Risk remaining: Live end-to-end verification still depends on actual OpenSky input, Spark output on `flights_processed`, and row growth in PostgreSQL.
