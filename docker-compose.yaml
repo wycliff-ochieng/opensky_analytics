@@ -32,3 +32,61 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: opensky
+      POSTGRES_USER: opensky
+      POSTGRES_PASSWORD: opensky
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  spark-master:
+    image: apache/spark:3.5.0
+    container_name: spark-master
+    entrypoint:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+    ports:
+      - 7077:7077
+      - 8080:8080
+    expose:
+      - 7077
+      - 8080
+    environment:
+      SPARK_MASTER_WEBUI_PORT: 8080
+      SPARK_MASTER_PORT: 7077
+    volumes:
+      - ./processing_layer:/opt/spark-apps
+
+  spark-worker:
+    image: apache/spark:3.5.0
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    entrypoint:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - spark://spark-master:7077
+    ports:
+      - 8081:8081
+    expose:
+      - 8081
+    environment:
+      SPARK_WORKER_WEBUI_PORT: 8081
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 2G
+    volumes:
+      - ./processing_layer:/opt/spark-apps
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: opensky_analytics_network
