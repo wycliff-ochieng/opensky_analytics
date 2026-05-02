@@ -2,20 +2,23 @@ import logging
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, when
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType
+import os
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Kafka Configuration
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-INPUT_TOPIC = "flights_raw"
-OUTPUT_TOPIC = "flights_processed"
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+INPUT_TOPIC = os.environ.get("INPUT_TOPIC", "flights_raw")
+OUTPUT_TOPIC = os.environ.get("OUTPUT_TOPIC", "flights_processed")
+SPARK_MASTER = os.environ.get("SPARK_MASTER", "spark://spark-master:7077")
 
 # 1. Initialize Spark Session with Kafka Dependencies
 # We need to download the spark-sql-kafka package to talk to Kafka
 spark = SparkSession.builder \
     .appName("FlightDataProcessor") \
+    .master(SPARK_MASTER) \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0") \
     .getOrCreate()
 
