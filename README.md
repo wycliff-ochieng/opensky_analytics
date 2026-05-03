@@ -56,16 +56,16 @@ cd opensky_analytics
 ### 2. Start Services
 
 ```bash
-docker-compose up -d
+make start
 ```
 
 Verify all services are running:
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
-Expected output: kafka, zookeeper, postgres, spark-master, spark-worker, go-backend all in "Up" state.
+Expected output: kafka, zookeeper, kafka-ui, postgres, spark-master, spark-worker, backend, sink, spark-job, ingestion all in "Up" state.
 
 ### 3. Create Kafka Topics
 
@@ -87,35 +87,17 @@ docker exec kafka kafka-topics --list --bootstrap-server kafka:29092
 
 ### 4. Start the Three Jobs
 
-Open three separate terminals and run each job:
+The stack now starts in Docker in the correct order:
 
-**Terminal 1 - Ingestion:**
 ```bash
-docker exec -e KAFKA_BROKER=kafka:9092 opensky_analytics-kafka-1 \
-  python /workspace/ingestion_layer/ingest.py
+make start
 ```
 
-Or from host (requires Python venv):
-```bash
-source venv/bin/activate
-python ingestion_layer/ingest.py
-```
+To start only the downstream services first, use:
 
-**Terminal 2 - Spark Processing:**
 ```bash
-./run_spark_job.sh cluster
-```
-
-**Terminal 3 - Sink to PostgreSQL:**
-```bash
-docker exec -e KAFKA_BROKER=kafka:9092 opensky_analytics-kafka-1 \
-  python /workspace/processing_layer/sink_to_db.py
-```
-
-Or from host (requires Python venv):
-```bash
-source venv/bin/activate
-python processing_layer/sink_to_db.py
+make run-apps
+make run-ingest
 ```
 
 ### 5. Query the API
@@ -138,10 +120,12 @@ Expected response: JSON array of flight objects with enriched data (velocity_kmh
 ├── processing_layer/
 │   ├── process_flights.py    # Spark Structured Streaming job
 │   ├── sink_to_db.py         # Consume flights_processed, write to PostgreSQL
-│   ├── test_sink.py          # Unit tests for sink
+│   └── test/                 # Processing layer tests
 │   └── requirements.txt       # Dependencies (pyspark, kafka-python, psycopg2)
 ├── backend_layer/
 │   ├── main.go               # REST API server (port 8080)
+│   ├── app/                  # Reusable Go backend package
+│   └── test/                 # Go backend tests
 │   └── go.mod                # Go dependencies
 ├── docs/
 │   ├── architecture.md        # Detailed job inventory and function wiring
@@ -185,6 +169,11 @@ docker exec kafka kafka-console-consumer --bootstrap-server kafka:29092 \
   --topic flights_raw --from-beginning --max-messages 5
 ```
 
+**Kafka UI Dashboard:**
+Access Kafka UI at `http://localhost:8100` to view topics, partitions, and message counts:
+
+![Kafka UI Topics](./Pasted%20image.png)
+
 ### View PostgreSQL Data
 
 Connect to PostgreSQL:
@@ -198,6 +187,11 @@ SELECT COUNT(*) FROM flights_processed;
 SELECT * FROM flights_processed LIMIT 5;
 ```
 
+**PostgreSQL Data Sample:**
+Example output from the flights_processed table showing real flight data being persisted:
+
+![PostgreSQL Flights Data](./Screenshot%20From%202026-05-03%2021-58-48.png)
+
 ### Monitor Spark UI
 
 Once the Spark job is running:
@@ -206,6 +200,16 @@ Once the Spark job is running:
 http://localhost:4040  (driver UI, while job runs)
 http://localhost:8080  (master UI, persistent)
 ```
+
+**Spark Master Dashboard:**
+View the Spark Master UI showing worker nodes and running applications:
+
+![Spark Master UI](./Screenshot%20From%202026-05-03%2021-57-19.png)
+
+**Spark Application Detail:**
+Monitor the FlightDataProcessor application with executor information and resource usage:
+
+![Spark Application Detail](./Screenshot%20From%202026-05-03%2021-57-50.png)
 
 Monitor data growth in PostgreSQL:
 ```bash
@@ -217,21 +221,21 @@ watch -n 1 "docker exec postgres psql -U opensky -d opensky -c 'SELECT COUNT(*) 
 ### Stop All Services
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### Restart a Single Service
 
 ```bash
-docker-compose restart spark-master
+docker compose restart spark-master
 # or, restart and rebuild
-docker-compose up -d --force-recreate kafka
+docker compose up -d --force-recreate kafka
 ```
 
 ### View Service Logs
 
 ```bash
-docker-compose logs -f ingestion_layer  # Ingestion logs (if running in compose)
+docker compose logs -f ingestion         # Ingestion logs (if running in compose)
 docker logs <container-id>              # Single container logs
 docker exec spark-master tail -f /opt/spark/logs/*.log
 ```
