@@ -26,3 +26,11 @@
 - Root cause: The UI was pointed at the wrong bootstrap address for Docker networking.
 - Fix: Use `kafka:29092` inside containers and `localhost:9092` only from the host.
 - Risk remaining: Live end-to-end verification still depends on actual OpenSky input, Spark output on `flights_processed`, and row growth in PostgreSQL.
+
+## 2026-05-03 - Backend Layer Repair
+- Issue: Backend Go sources were malformed and would not parse.
+- Root cause: Duplicated package/import blocks and a merged test file left `main.go`, `app.go`, and the backend test file syntactically invalid.
+- Fix: Rewrote the backend entrypoint, app package, and backend tests into valid Go files.
+- Issue: CI had no explicit lint stage.
+- Root cause: The workflow only ran tests and smoke checks.
+- Fix: Added lint targets and wired them into CI before the slower test and startup stages.
