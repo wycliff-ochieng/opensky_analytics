@@ -2,7 +2,7 @@
 
 Complete reference for the OpenSky Analytics data pipeline project.
 
-## 📚 Documentation Index
+## Documentation Index
 
 ### Project Overview
 - **[engineering_log.md](./engineering_log.md)** - Development timeline, decisions, and checkpoints
@@ -11,7 +11,7 @@ Complete reference for the OpenSky Analytics data pipeline project.
 - **[architecture.md](./architecture.md)** - Kafka/Spark runtime architecture, job inventory, and function wiring
 
 ### Infrastructure & Deployment
-- **[INFRASTRUCTURE_SETUP.md](./INFRASTRUCTURE_SETUP.md)** ⭐ **START HERE**
+- **[INFRASTRUCTURE_SETUP.md](./INFRASTRUCTURE_SETUP.md)**  **START HERE**
   - Complete infrastructure overview
   - Service configuration (Zookeeper, Kafka, PostgreSQL, Spark)
   - Kafka UI, Spark UI access points
@@ -29,9 +29,10 @@ Complete reference for the OpenSky Analytics data pipeline project.
   - Quick fixes and hard reset procedures
 
 ### Code & Testing
-- See `[PROJECT_ROOT]/ingestion_layer/test_ingest.py` - Ingestion layer unit tests
-- See `[PROJECT_ROOT]/processing_layer/test_sink.py` - Sink layer unit tests
-- See `[PROJECT_ROOT]/processing_layer/test_process_flights.py` - Spark processing tests
+- See `[PROJECT_ROOT]/ingestion_layer/test/test_ingest.py` - Ingestion layer unit tests
+- See `[PROJECT_ROOT]/processing_layer/test/test_sink.py` - Sink layer unit tests
+- See `[PROJECT_ROOT]/processing_layer/test/test_process_flights.py` - Spark processing tests
+- See `[PROJECT_ROOT]/backend_layer/test/backend_test.go` - Go backend tests
 
 ---
 
@@ -40,7 +41,7 @@ Complete reference for the OpenSky Analytics data pipeline project.
 ### 1. Start Infrastructure
 ```bash
 cd /home/wyckie/Desktop/MyProjects/opensky_analytics
-docker compose up -d
+make start
 ```
 
 ### 2. Monitor Services
@@ -57,8 +58,7 @@ docker compose ps
 ### 3. Test Pipeline
 ```bash
 # Run unit tests
-source venv/bin/activate
-python -m pytest ingestion_layer/test_ingest.py processing_layer/test_sink.py -v
+make test
 ```
 
 ### 4. Troubleshoot Issues
@@ -66,7 +66,7 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for specific problems.
 
 ---
 
-## 📋 Architecture Overview
+##  Architecture Overview
 
 ```
 OpenSky API
@@ -115,27 +115,30 @@ For the full function-by-function wiring, see [architecture.md](./architecture.m
 
 ## 📊 Test Coverage
 
-### Ingestion Layer (`ingestion_layer/test_ingest.py`)
-- ✅ 14/14 tests passing
+### Ingestion Layer (`ingestion_layer/test/test_ingest.py`)
+- 14/14 tests passing
 - Kafka producer creation & retry logic
 - Flight data fetch with error handling
 - Data processing & malformed flight handling
 
-### Sink Layer (`processing_layer/test_sink.py`)
-- ✅ 10/10 tests passing
+### Sink Layer (`processing_layer/test/test_sink.py`)
+- 10/10 tests passing
 - Database connection & retry logic
 - Kafka consumer creation
 - Payload normalization
 
-### Processing Layer (`processing_layer/test_process_flights.py`)
+### Processing Layer (`processing_layer/test/test_process_flights.py`)
 - Schema tests validate the Spark event shape
 - Integration checks run against the Spark container and Kafka topic path
 
-**Status: ingestion and sink unit coverage complete; Spark processing is container-based**
+### Backend Layer (`backend_layer/test/backend_test.go`)
+- Go tests validate the health endpoint and limit parsing
+
+**Status: ingestion, sink, and backend unit coverage complete; Spark processing is container-based**
 
 ---
 
-## 🔧 Common Operations
+##  Common Operations
 
 ### Check Service Status
 ```bash
@@ -161,8 +164,7 @@ docker exec kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic 
 
 ### Run Tests
 ```bash
-source venv/bin/activate
-python -m pytest ingestion_layer/ processing_layer/ -v
+make test
 ```
 
 ### Reset Data (Hard Reset)
@@ -173,7 +175,7 @@ docker compose up -d            # Start fresh
 
 ---
 
-## 📝 Development Notes
+##  Development Notes
 
 ### Kafka Bootstrap Addresses
 - **From Host**: `localhost:9092`
