@@ -1,0 +1,68 @@
+name: ci-cd
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Docker Buildx is available
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run lint checks
+        run: make lint
+
+  test-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: lint
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Docker Buildx is available
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start infrastructure
+        run: make up
+
+      - name: Wait for Kafka and bootstrap schema
+        run: |
+          make wait-kafka
+          make create-topics
+          make create-schema
+
+      - name: Build runtime images
+        run: make build-images
+
+      - name: Run unit tests
+        run: make test
+
+      - name: Start runtime services
+        run: make run-apps
+
+      - name: Smoke test backend health endpoint
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend health check failed"
+          exit 1
+
+      - name: Stop services
+        if: always()
+        run: make stop
