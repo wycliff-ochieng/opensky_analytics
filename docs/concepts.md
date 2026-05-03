@@ -15,3 +15,4 @@
 - Module-scoped build context: Go commands should run inside `backend_layer` because the module root is there.
 - Source-only hygiene: Syntax/build checks can produce local artifacts, so cleanup should be part of the validation loop.
 - Compose compatibility: Deprecated keys (like top-level `version`) still work but should be removed to reduce future confusion.
+- Lint-first automation: Put format and lint checks ahead of runtime smoke tests so source issues fail fast.
