@@ -187,13 +187,13 @@ The backend API is not counted as a stream job because it only serves queries fr
 ### 1. Start All Services
 ```bash
 cd /home/wyckie/Desktop/MyProjects/opensky_analytics
-docker compose up -d
+make start
 ```
 
 ### 2. Verify Services
 ```bash
 docker compose ps
-# Should show: zookeeper, kafka, kafka-ui, postgres, spark-master, spark-worker
+# Should show: zookeeper, kafka, kafka-ui, postgres, spark-master, spark-worker, backend, sink, spark-job, ingestion
 ```
 
 ### 3. Wait for Startup (30-60 seconds)
