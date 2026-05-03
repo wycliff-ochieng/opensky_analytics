@@ -69,11 +69,13 @@ lint-backend:
 
 lint-ingestion:
 	@echo "Linting ingestion layer..."
-	$(COMPOSE) run --rm --no-deps --build ingestion ruff check ingest.py test
+	docker build -f $(ROOT_DIR)/ingestion_layer/Dockerfile -t opensky-ingestion-lint $(ROOT_DIR)/ingestion_layer
+	docker run --rm opensky-ingestion-lint ruff check ingest.py test
 
 lint-processing:
 	@echo "Linting processing layer..."
-	$(COMPOSE) run --rm --no-deps --build sink ruff check process_flights.py sink_to_db.py test
+	docker build -f $(ROOT_DIR)/processing_layer/Dockerfile -t opensky-sink-lint $(ROOT_DIR)/processing_layer
+	docker run --rm opensky-sink-lint ruff check process_flights.py sink_to_db.py test
 
 test-ingestion:
 	@echo "Running ingestion tests inside Docker..."
