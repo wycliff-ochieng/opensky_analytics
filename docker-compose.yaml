@@ -33,6 +33,18 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
+  ingestion:
+    build:
+      context: ./ingestion_layer
+    container_name: ingestion
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:29092
+      OPENSKY_URL: https://opensky-network.org/api/states/all
+      POLL_INTERVAL_SECONDS: 10
+    restart: unless-stopped
+
 
   postgres:
     image: postgres:16-alpine
@@ -45,6 +57,47 @@ services:
       POSTGRES_PASSWORD: opensky
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  sink:
+    build:
+      context: ./processing_layer
+    container_name: sink
+    depends_on:
+      - kafka
+      - postgres
+    environment:
+      KAFKA_BROKER: kafka:29092
+      KAFKA_TOPIC: flights_processed
+      KAFKA_GROUP: flights-db-sink
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opensky
+      DB_USER: opensky
+      DB_PASSWORD: opensky
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend_layer
+    container_name: backend
+    depends_on:
+      - postgres
+    ports:
+      - 8000:8080
+    environment:
+      DATABASE_URL: postgresql://opensky:opensky@postgres:5432/opensky?sslmode=disable
+      HTTP_ADDR: 0.0.0.0:8080
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    depends_on:
+      - backend
+    ports:
+      - 3000:80
+    restart: unless-stopped
 
   spark-master:
     image: apache/spark:3.5.0
@@ -83,6 +136,32 @@ services:
       SPARK_WORKER_MEMORY: 2G
     volumes:
       - ./processing_layer:/opt/spark-apps
+
+  spark-job:
+    image: apache/spark:3.5.0
+    container_name: spark-job
+    depends_on:
+      - spark-master
+      - spark-worker
+      - kafka
+    volumes:
+      - ./processing_layer:/opt/spark-apps
+    environment:
+      SPARK_MASTER: spark://spark-master:7077
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      INPUT_TOPIC: flights_raw
+      OUTPUT_TOPIC: flights_processed
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - spark://spark-master:7077
+      - --deploy-mode
+      - client
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
+      - --conf
+      - spark.jars.ivy=/tmp/.ivy2
+      - /opt/spark-apps/process_flights.py
 
 volumes:
   postgres_data:

@@ -23,11 +23,11 @@ echo ""
 if [ "$ENVIRONMENT" == "cluster" ]; then
   echo "Checking Spark cluster..."
   if ! docker ps | grep -q spark-master; then
-    echo "❌ Spark Master not running. Start with: docker compose up -d"
+    echo " Spark Master not running. Start with: docker compose up -d"
     exit 1
   fi
   if ! docker ps | grep -q kafka; then
-    echo "❌ Kafka not running. Start with: docker compose up -d"
+    echo " Kafka not running. Start with: docker compose up -d"
     exit 1
   fi
   echo "✓ Spark cluster and Kafka running"

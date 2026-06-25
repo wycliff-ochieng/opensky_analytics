@@ -34,11 +34,14 @@ create-schema:
 
 build-images:
 	@echo "Building application images..."
-	$(COMPOSE) build backend ingestion sink
+	docker build -f $(ROOT_DIR)/backend_layer/Dockerfile -t opensky-backend $(ROOT_DIR)/backend_layer
+	docker build -f $(ROOT_DIR)/ingestion_layer/Dockerfile -t opensky-ingestion $(ROOT_DIR)/ingestion_layer
+	docker build -f $(ROOT_DIR)/processing_layer/Dockerfile -t opensky-sink $(ROOT_DIR)/processing_layer
+	docker build -f $(ROOT_DIR)/frontend/Dockerfile -t opensky-frontend $(ROOT_DIR)/frontend
 
 run-apps:
 	@echo "Starting containerized application services..."
-	$(COMPOSE) up -d --build backend sink spark-job
+	$(COMPOSE) up -d --build backend sink spark-job frontend
 
 run-ingest:
 	@echo "Starting ingestion container..."
