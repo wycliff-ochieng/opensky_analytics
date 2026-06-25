@@ -6,23 +6,35 @@ A real-time flight data pipeline that ingests data from the OpenSky Network API,
 
 ```
 OpenSky API
-    ↓
-[Ingestion Job] → Kafka (flights_raw)
-    ↓
-[Spark Streaming] → Kafka (flights_processed)
-    ↓
-[Sink Job] → PostgreSQL (flights_processed table)
-    ↓
-[Go Backend] → REST API (query flights)
+    │  poll every 10s
+    ▼
+[Ingestion Job] ──► Kafka (flights_raw)
+                        │
+                        ▼
+              [Spark Streaming]
+                        │  filter, enrich (velocity_kmh, status)
+                        ▼
+              Kafka (flights_processed)
+                        │
+                        ▼
+              [Sink Job] ──► PostgreSQL
+                                  │
+                                  ▼
+                        [Go Backend] ──► REST API (:8000)
+                                              │
+                                              ▼
+                                  [React Frontend] ──► Dashboard (:3000)
 ```
 
-**3 Runtime Jobs:**
+**4 Runtime Jobs:**
 1. **Ingestion** (`ingestion_layer/ingest.py`): Polls OpenSky API every 10 seconds, publishes raw flight state messages to `flights_raw` Kafka topic.
 2. **Processing** (`processing_layer/process_flights.py`): Spark Structured Streaming job reads from `flights_raw`, enriches data (velocity in km/h, flight status), writes to `flights_processed` topic.
 3. **Sink** (`processing_layer/sink_to_db.py`): Kafka consumer reads from `flights_processed`, persists records to PostgreSQL `flights_processed` table.
+4. **Frontend** (`frontend/`): React + MapLibre GL dashboard polling the Go API every 5 seconds. Shows live aircraft positions on a map and a scrollable flight table.
 
 **Serving Layer:**
 - **Go Backend** (`backend_layer/main.go`): REST API that queries PostgreSQL directly (does not consume Kafka).
+- **React Frontend** (`frontend/`): Live map dashboard at `http://localhost:3000`.
 
 For detailed architecture documentation, see [docs/architecture.md](./docs/architecture.md).
 
@@ -35,7 +47,9 @@ For detailed architecture documentation, see [docs/architecture.md](./docs/archi
 | Apache Spark | 3.5.0 | Stream processing (Structured Streaming) |
 | PostgreSQL | 16-alpine | Persistent data store |
 | Python | 3.11+ | Ingestion and sink jobs |
-| Go | 1.21+ | REST API backend |
+| Go | 1.24+ | REST API backend |
+| React + Vite | 19 | Frontend dashboard |
+| MapLibre GL | 4.7 | Interactive flight map |
 | Docker Compose | — | Container orchestration |
 
 ## Prerequisites
@@ -65,50 +79,27 @@ Verify all services are running:
 docker compose ps
 ```
 
-Expected output: kafka, zookeeper, kafka-ui, postgres, spark-master, spark-worker, backend, sink, spark-job, ingestion all in "Up" state.
+Expected output: kafka, zookeeper, kafka-ui, postgres, spark-master, spark-worker, backend, sink, spark-job, ingestion, frontend all in "Up" state.
 
-### 3. Create Kafka Topics
+### 3. Open Dashboard
 
-The `flights_raw` topic is auto-created. Create `flights_processed` manually:
+Once the pipeline is running, open the live dashboard:
 
-```bash
-docker exec kafka kafka-topics --create \
-  --topic flights_processed \
-  --partitions 3 \
-  --replication-factor 1 \
-  --bootstrap-server kafka:29092
+```
+http://localhost:3000
 ```
 
-Verify both topics exist:
+You'll see a live map of aircraft positions and a flight table updating every 5 seconds.
+
+### 4. Query the API Directly
 
 ```bash
-docker exec kafka kafka-topics --list --bootstrap-server kafka:29092
-```
-
-### 4. Start the Three Jobs
-
-The stack now starts in Docker in the correct order:
-
-```bash
-make start
-```
-
-To start only the downstream services first, use:
-
-```bash
-make run-apps
-make run-ingest
-```
-
-### 5. Query the API
-
-Once the pipeline is running and data flows into PostgreSQL, query the backend:
-
-```bash
-curl http://localhost:8080/flights | jq .
+curl http://localhost:8000/flights | python3 -m json.tool
 ```
 
 Expected response: JSON array of flight objects with enriched data (velocity_kmh, status, etc.).
+
+For a detailed step-by-step guide, see [spin_up.md](./spin_up.md).
 
 ## Project Structure
 
@@ -127,6 +118,18 @@ Expected response: JSON array of flight objects with enriched data (velocity_kmh
 │   ├── app/                  # Reusable Go backend package
 │   └── test/                 # Go backend tests
 │   └── go.mod                # Go dependencies
+├── frontend/
+│   ├── Dockerfile              # Multi-stage build (Node → Nginx)
+│   ├── nginx.conf              # Proxies /api/* to Go backend
+│   ├── package.json            # React + Vite + MapLibre GL
+│   └── src/
+│       ├── App.tsx              # Root component
+│       ├── api.ts               # API client (fetchFlights, fetchHealth)
+│       ├── types.ts             # Flight type definition
+│       └── components/
+│           ├── Dashboard.tsx    # Polling loop, layout
+│           ├── FlightMap.tsx    # MapLibre GL map with animated markers
+│           └── FlightTable.tsx  # Scrollable flight data table
 ├── docs/
 │   ├── architecture.md        # Detailed job inventory and function wiring
 │   ├── INFRASTRUCTURE_SETUP.md  # Service configuration and Kafka topics
@@ -137,6 +140,14 @@ Expected response: JSON array of flight objects with enriched data (velocity_kmh
 │   └── postmortem.md         # Root cause analysis and lessons learned
 ├── docker-compose.yaml       # Service definitions (Kafka, Spark, PostgreSQL, etc.)
 ├── run_spark_job.sh          # Wrapper script to submit Spark job to cluster
+├── spin_up.md                # Step-by-step startup guide
+├── workflows/                # Workflow specifications
+│   ├── bug-fix.md
+│   ├── feature-implementation.md
+│   ├── experiment-spike.md
+│   ├── stack-reset.md
+│   └── session-handoff.md
+├── NOTES.md                  # Development notes and vocabulary
 └── README.md                 # This file
 ```
 
@@ -169,10 +180,10 @@ docker exec kafka kafka-console-consumer --bootstrap-server kafka:29092 \
   --topic flights_raw --from-beginning --max-messages 5
 ```
 
-**Kafka UI Dashboard:**
+**Kafka UI Topics Dashboard:**
 Access Kafka UI at `http://localhost:8100` to view topics, partitions, and message counts:
 
-![Kafka UI Topics](./Pasted%20image.png)
+![Kafka UI Topics](./kafka.png)
 
 ### View PostgreSQL Data
 
@@ -190,7 +201,7 @@ SELECT * FROM flights_processed LIMIT 5;
 **PostgreSQL Data Sample:**
 Example output from the flights_processed table showing real flight data being persisted:
 
-![PostgreSQL Flights Data](./Screenshot%20From%202026-05-03%2021-58-48.png)
+![PostgreSQL Flights Data](./postgres-psql.png)
 
 ### Monitor Spark UI
 
@@ -204,17 +215,37 @@ http://localhost:8080  (master UI, persistent)
 **Spark Master Dashboard:**
 View the Spark Master UI showing worker nodes and running applications:
 
-![Spark Master UI](./Screenshot%20From%202026-05-03%2021-57-19.png)
+![Spark Master UI](./spark.png)
 
 **Spark Application Detail:**
 Monitor the FlightDataProcessor application with executor information and resource usage:
 
-![Spark Application Detail](./Screenshot%20From%202026-05-03%2021-57-50.png)
+![Spark Application Detail](./spar-worker.png)
 
 Monitor data growth in PostgreSQL:
 ```bash
 watch -n 1 "docker exec postgres psql -U opensky -d opensky -c 'SELECT COUNT(*) FROM flights_processed;'"
 ```
+
+## Services & Ports
+
+| Service      | Port  | Purpose            |
+|--------------|-------|--------------------|
+| frontend     | 3000  | Dashboard (map + table) |
+| backend      | 8000  | Go REST API        |
+| kafka-ui     | 8100  | Kafka admin UI     |
+| postgres     | 5432  | Database           |
+
+## Frontend Dashboard
+
+The React frontend at `http://localhost:3000` provides:
+
+- **Live Map** — MapLibre GL map with aircraft positions color-coded by status (green climbing, red descending, amber cruising). Click a dot for flight details.
+- **Smooth Animation** — Aircraft positions interpolate smoothly between 5-second polls.
+- **Flight Table** — Scrollable list of recent flights with callsign, ICAO24, country, speed, and status.
+- **Auto-refresh** — Polls the Go API every 5 seconds via nginx proxy (`/api/*` → backend).
+
+![Dashboard Map](./spark.png)
 
 ## Common Tasks
 
@@ -286,6 +317,7 @@ For more troubleshooting steps, see [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOO
 - [Architecture Guide](./docs/architecture.md) — Job inventory, service map, function-level wiring
 - [Infrastructure Setup](./docs/INFRASTRUCTURE_SETUP.md) — Complete service configuration and Kafka topics
 - [Running Spark Jobs](./docs/RUNNING_SPARK_JOBS.md) — How to submit and monitor Spark streaming job
+- [Spin Up Guide](./spin_up.md) — Step-by-step startup and verification
 - [Troubleshooting](./docs/TROUBLESHOOTING.md) — Common issues, diagnostics, and fixes
 - [Concepts](./docs/concepts.md) — Design patterns and terminology
 - [Engineering Log](./docs/engineering_log.md) — Development timeline
@@ -293,12 +325,12 @@ For more troubleshooting steps, see [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOO
 
 ## Next Steps
 
-- [ ] Run end-to-end pipeline and verify data flows through all three jobs
-- [ ] Monitor PostgreSQL row count growth and API response times
-- [ ] Add visual flow diagram (Mermaid sequence diagram) to architecture.md
-- [ ] Set up alerting on Kafka lag and PostgreSQL query latency
+- [ ] Batch processing flow (nightly Airflow DAGs, S3/Delta Lake, dbt)
+- [ ] WebSocket real-time push instead of 5s polling
+- [ ] Alerting on Kafka lag and PostgreSQL query latency
 - [ ] Load-test with sustained OpenSky API polling (currently 10s interval)
-- [ ] Implement metrics collection (Prometheus/Grafana)
+- [ ] Grafana dashboards for pipeline metrics
+- [ ] Kubernetes deployment (Phase 4)
 
 ## Contributing
 
