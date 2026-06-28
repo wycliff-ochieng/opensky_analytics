@@ -1,9 +1,12 @@
-import requests
 import os
 import time
 import json
 import logging
+import threading
+
+import requests
 from kafka import KafkaProducer
+from prometheus_client import start_http_server, Counter, Histogram
 
 _logger = logging.getLogger(__name__)
 
@@ -11,6 +14,13 @@ KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "localhost:9092")
 KAFKA_TOPIC = "flights_raw"
 OPENSKY_URL = "https://opensky-network.org/api/states/all"
 POLL_INTERVAL_SECONDS = 10
+METRICS_PORT = int(os.environ.get("METRICS_PORT", "8001"))
+
+polls_total = Counter("ingestion_polls_total", "Total number of OpenSky API polls")
+flights_sent_total = Counter("ingestion_flights_sent_total", "Total number of flights sent to Kafka")
+ingestion_errors_total = Counter("ingestion_errors_total", "Total number of ingestion errors", ["type"])
+poll_duration = Histogram("ingestion_poll_duration_seconds", "Duration of OpenSky API polls in seconds", buckets=[0.5, 1, 2, 5, 10, 30])
+
 
 def create_kafka_producer():
 
@@ -56,62 +66,48 @@ def process_and_send(producer, data):
     sent_count = 0
     for state in data['states']:
         try:
-            # Skip malformed flights that don't have enough columns
             if len(state) < len(columns):
                 _logger.warning(f"Skipping malformed flight with {len(state)} columns instead of {len(columns)}")
                 continue
-                
-            # Create a dictionary for the flight
+
             flight_data = dict(zip(columns, state))
-            
-            # Add timestamp from the response
+
             flight_data['timestamp'] = data['time']
 
-            # Send to Kafka
             producer.send(KAFKA_TOPIC, value=flight_data)
             sent_count += 1
         except Exception as e:
             _logger.error(f"Failed to process/send flight: {e}")
-    
+
     producer.flush()
+    flights_sent_total.inc(sent_count)
     _logger.info(f"Sent {sent_count} flights to Kafka.")
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
+
+    start_http_server(METRICS_PORT)
+    _logger.info(f"Metrics HTTP server started on port {METRICS_PORT}")
+
     producer = create_kafka_producer()
 
     while True:
-        """_logger.info("Fetching flight data...")
-        data = fetch_flight_data()
-        process_and_send(producer, data)
-        time.sleep(POLL_INTERVAL_SECONDS)
-
-        if data and 'states' in  data and data['states']:
-
-            producer.send(KAFKA_TOPIC, value=data)
-            producer.flush()
-            print("Data sent succeesfully")
-        else:
-            _logger.error("No flight data fetched")
-            print("Failed to fetch flight data")
-            print(f"Sleeping for {POLL_INTERVAL_SECONDS} seconds...")
-            time.sleep(POLL_INTERVAL_SECONDS)"""
-        
         _logger.info("Fetching flight data...")
-        data = fetch_flight_data()
-        
+        polls_total.inc()
+
+        with poll_duration.time():
+            data = fetch_flight_data()
+
         if data:
-            # This handles the parsing and sending of the individual planes. 
-            # It works perfectly!
             process_and_send(producer, data)
         else:
             _logger.error("Failed to fetch flight data")
-            
+            ingestion_errors_total.labels(type="fetch").inc()
+
         _logger.info(f"Sleeping for {POLL_INTERVAL_SECONDS} seconds...\n")
         time.sleep(POLL_INTERVAL_SECONDS)
 
+
 if __name__ == "__main__":
     main()
-
-    
