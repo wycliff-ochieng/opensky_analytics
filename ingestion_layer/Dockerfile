@@ -11,4 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ingest.py ./
 COPY test ./test
 
+EXPOSE 8001
+
 CMD ["python", "-u", "ingest.py"]
