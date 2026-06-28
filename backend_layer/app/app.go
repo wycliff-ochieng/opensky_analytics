@@ -7,8 +7,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Flight struct {
@@ -20,6 +24,72 @@ type Flight struct {
 	VelocityKmh   *float64 `json:"velocity_kmh,omitempty"`
 	Status        *string  `json:"status,omitempty"`
 	Timestamp     int64    `json:"timestamp"`
+}
+
+var (
+	httpRequestsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"path", "method", "status"},
+	)
+
+	httpRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "Duration of HTTP requests in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"path", "method"},
+	)
+
+	dbQueryDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "db_query_duration_seconds",
+			Help:    "Duration of database queries in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"query"},
+	)
+
+	dbQueryErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "db_query_errors_total",
+			Help: "Total number of database query errors",
+		},
+		[]string{"query"},
+	)
+
+	flightsServed = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "flights_served_per_request",
+			Help:    "Number of flights returned per request",
+			Buckets: []float64{1, 5, 10, 25, 50, 100, 200, 500},
+		},
+	)
+)
+
+func metricsMiddleware(next http.HandlerFunc, path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next(sw, r)
+		duration := time.Since(start).Seconds()
+		status := strconv.Itoa(sw.status)
+		httpRequestsTotal.WithLabelValues(path, r.Method, status).Inc()
+		httpRequestDuration.WithLabelValues(path, r.Method).Observe(duration)
+	}
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(status int) {
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
 }
 
 func CreateTableIfNotExists(db *sql.DB) error {
@@ -72,6 +142,7 @@ func ParseLimit(value string) int {
 }
 
 func FlightsHandler(db *sql.DB) http.HandlerFunc {
+	const queryName = "select_flights"
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -80,13 +151,16 @@ func FlightsHandler(db *sql.DB) http.HandlerFunc {
 
 		limit := ParseLimit(r.URL.Query().Get("limit"))
 
+		queryStart := time.Now()
 		rows, err := db.Query(`
 			SELECT icao24, callsign, origin_country, longitude, latitude, velocity_kmh, status, timestamp
 			FROM flights_processed
 			ORDER BY timestamp DESC
 			LIMIT $1
 		`, limit)
+		dbQueryDuration.WithLabelValues(queryName).Observe(time.Since(queryStart).Seconds())
 		if err != nil {
+			dbQueryErrors.WithLabelValues(queryName).Inc()
 			log.Printf("query failed: %v", err)
 			http.Error(w, "failed to query flights", http.StatusInternalServerError)
 			return
@@ -106,6 +180,7 @@ func FlightsHandler(db *sql.DB) http.HandlerFunc {
 				&flight.Status,
 				&flight.Timestamp,
 			); err != nil {
+				dbQueryErrors.WithLabelValues(queryName).Inc()
 				log.Printf("scan failed: %v", err)
 				http.Error(w, "failed to read flights", http.StatusInternalServerError)
 				return
@@ -114,10 +189,13 @@ func FlightsHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if err := rows.Err(); err != nil {
+			dbQueryErrors.WithLabelValues(queryName).Inc()
 			log.Printf("rows error: %v", err)
 			http.Error(w, "failed to read flights", http.StatusInternalServerError)
 			return
 		}
+
+		flightsServed.Observe(float64(len(flights)))
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(flights); err != nil {
@@ -128,15 +206,16 @@ func FlightsHandler(db *sql.DB) http.HandlerFunc {
 
 func NewMux(db *sql.DB) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/health", metricsMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
-	})
-	mux.HandleFunc("/flights", FlightsHandler(db))
+	}, "/health"))
+	mux.HandleFunc("/flights", metricsMiddleware(FlightsHandler(db), "/flights"))
 	return mux
 }
 
