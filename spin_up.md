@@ -236,14 +236,61 @@ Expect: same JSON as hitting the backend directly.
 
 ---
 
+## Monitoring — Prometheus & Grafana
+
+The pipeline includes a full observability stack. Bring it up alongside the pipeline:
+
+```bash
+make up-mon
+```
+
+Or start everything including monitoring in one shot:
+
+```bash
+make start-mon
+```
+
+### What gets instrumented
+
+| Component | Metrics Port | Key Metrics |
+|-----------|-------------|-------------|
+| Go backend | `:8080/metrics` | Request rate, latency (p95), DB query duration, flights served |
+| Python ingestion | `:8001` | Poll rate, flights sent/s, poll duration, errors |
+| Python sink | `:8002` | Messages consumed/s, DB insert rate & latency, commit latency |
+| Kafka exporter | `:9308` | Consumer group lag by topic |
+| PostgreSQL exporter | `:9187` | DB connections, transaction rate, rows |
+
+### Access
+
+| Service   | URL                          | Credentials |
+|-----------|------------------------------|-------------|
+| Prometheus | http://localhost:9090        | —           |
+| Grafana    | http://localhost:3001        | admin/admin |
+
+Grafana comes pre-provisioned with a Prometheus data source and an **OpenSky Pipeline Overview** dashboard. Open Grafana, go to **Dashboards**, and select it.
+
+### Shutdown
+
+Monitoring services stop with `make stop` or individually:
+
+```bash
+make stop  # stops everything including monitoring
+```
+
+---
+
 ## Services & Ports
 
-| Service      | Port  | Purpose            |
-|--------------|-------|--------------------|
-| frontend     | 3000  | Dashboard (map + table) |
-| backend      | 8000  | Go REST API        |
-| kafka-ui     | 8100  | Kafka admin UI     |
-| postgres     | 5432  | Database           |
+| Service           | Port  | Purpose                  |
+|-------------------|-------|--------------------------|
+| frontend          | 3000  | Dashboard (map + table)  |
+| backend           | 8000  | Go REST API              |
+| kafka-ui          | 8100  | Kafka admin UI           |
+| postgres          | 5432  | Database                 |
+| prometheus        | 9090  | Metrics store            |
+| kafka-exporter    | 9308  | Kafka consumer lag       |
+| postgres-exporter | 9187  | PostgreSQL metrics       |
+| grafana           | 3001  | Dashboards & alerting    |
 
 ## Shutdown
 
