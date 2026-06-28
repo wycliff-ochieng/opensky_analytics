@@ -19,4 +19,6 @@ COPY process_flights.py ./
 COPY sink_to_db.py ./
 COPY test ./test
 
+EXPOSE 8002
+
 CMD ["python", "-u", "sink_to_db.py"]
