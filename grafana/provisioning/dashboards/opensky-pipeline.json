@@ -1,0 +1,337 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "title": "OpenSky Pipeline Overview",
+  "uid": "opensky-pipeline",
+  "version": 1,
+  "timezone": "browser",
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m"]
+  },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "schemaVersion": 39,
+  "style": "dark",
+  "panels": [
+    {
+      "title": "API Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total[1m])",
+          "legendFormat": "{{path}} {{method}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "API Latency (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, path))",
+          "legendFormat": "{{path}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "DB Query Duration (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(db_query_duration_seconds_bucket[1m])) by (le, query))",
+          "legendFormat": "{{query}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Flights Per Request",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(flights_served_per_request_sum[1m]) / rate(flights_served_per_request_count[1m])",
+          "legendFormat": "avg flights",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Ingestion Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(ingestion_flights_sent_total[1m])",
+          "legendFormat": "flights/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Ingestion Poll Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(ingestion_poll_duration_seconds_sum[1m]) / rate(ingestion_poll_duration_seconds_count[1m])",
+          "legendFormat": "avg poll",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Ingestion Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(ingestion_errors_total[1m])",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Sink Messages Consumed",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(sink_messages_consumed_total[1m])",
+          "legendFormat": "msg/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Sink DB Inserts",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(sink_db_inserts_total{status=\"success\"}[1m])",
+          "legendFormat": "success",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(sink_db_inserts_total{status=\"error\"}[1m])",
+          "legendFormat": "error",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(sink_db_inserts_total{status=\"skipped\"}[1m])",
+          "legendFormat": "skipped",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Sink Insert Duration (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sink_db_insert_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "insert p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sink_db_commit_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "commit p95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "Kafka Consumer Lag",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "kafka_consumergroup_lag{topic=\"flights_processed\"}",
+          "legendFormat": "lag",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    },
+    {
+      "title": "DB Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(db_query_errors_total[1m])",
+          "legendFormat": "{{query}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "showLegend": true, "placement": "bottom" } }
+    }
+  ]
+}
