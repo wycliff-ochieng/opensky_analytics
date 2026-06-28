@@ -5,13 +5,17 @@ ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMPOSE := docker compose -f $(ROOT_DIR)/docker-compose.yaml
 BACKEND_DIR := $(ROOT_DIR)/backend_layer
 
-.PHONY: all up wait-kafka create-topics create-schema build-images run-apps run-ingest start stop logs clean lint lint-backend lint-ingestion lint-processing test test-ingestion test-processing test-backend
+.PHONY: all up up-mon wait-kafka create-topics create-schema build-images run-apps run-ingest start start-mon stop logs clean lint lint-backend lint-ingestion lint-processing test test-ingestion test-processing test-backend
 
 all: start
 
 up:
 	@echo "Bringing up infrastructure services..."
 	$(COMPOSE) up -d --build zookeeper kafka kafka-ui postgres spark-master spark-worker
+
+up-mon:
+	@echo "Bringing up monitoring services (Prometheus + Grafana + exporters)..."
+	$(COMPOSE) up -d prometheus grafana kafka-exporter postgres-exporter
 
 wait-kafka:
 	@echo "Waiting for Kafka to be ready..."
@@ -49,6 +53,9 @@ run-ingest:
 
 start: up create-topics create-schema build-images run-apps run-ingest
 	@echo "All services started in Docker. Use '$(COMPOSE) ps' and '$(COMPOSE) logs -f' to inspect them."
+
+start-mon: up up-mon
+	@echo "Monitoring stack running: Prometheus :9090 | Grafana :3001 (admin/admin)"
 
 stop:
 	@echo "Stopping all services..."
