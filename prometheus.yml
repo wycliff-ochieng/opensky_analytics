@@ -2,54 +2,45 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
-
 scrape_configs:
-  # Prometheus itself
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # Kafka
-  - job_name: 'kafka'
+  - job_name: 'backend'
     static_configs:
-      - targets: ['kafka:29092']
+      - targets: ['backend:8080']
     metrics_path: /metrics
-    scheme: http
 
-  # Spark Master
+  - job_name: 'ingestion'
+    static_configs:
+      - targets: ['ingestion:8001']
+
+  - job_name: 'sink'
+    static_configs:
+      - targets: ['sink:8002']
+
+  - job_name: 'kafka-exporter'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'kafka-ui'
+    static_configs:
+      - targets: ['kafka-ui:8100']
+    metrics_path: /actuator/prometheus
+
   - job_name: 'spark-master'
     static_configs:
       - targets: ['spark-master:8080']
     metrics_path: /metrics
     scheme: http
 
-  # Spark Worker
   - job_name: 'spark-worker'
     static_configs:
       - targets: ['spark-worker:8081']
-    metrics_path: /metrics
-    scheme: http
-
-  # PostgreSQL
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres:5432']
-    metrics_path: /metrics
-    scheme: http
-
-  # OpenSky Backend API
-  - job_name: 'backend'
-    static_configs:
-      - targets: ['backend:8080']
-    metrics_path: /metrics
-    scheme: http
-
-  # Kafka UI
-  - job_name: 'kafka-ui'
-    static_configs:
-      - targets: ['kafka-ui:8100']
     metrics_path: /metrics
     scheme: http
