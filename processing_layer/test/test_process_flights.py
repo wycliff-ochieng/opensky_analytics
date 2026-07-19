@@ -72,13 +72,13 @@ class TestDataCleaning:
         """Test filtering rows with missing longitude or latitude."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=1.0, timestamp=1609459200),
             Row(icao24="def456", callsign="AA100", origin_country="US", time_position=1000,
-                last_contact=1001, longitude=None, latitude=40.7, baro_altitude=5000,
+                last_contact=1001, longitude=None, latitude=40.7, baro_altitude=5000.0,
                 on_ground="True", velocity=200.0, true_track=90.0, vertical_rate=-2.0, timestamp=1609459200),
             Row(icao24="ghi789", callsign="DL500", origin_country="US", time_position=1000,
-                last_contact=1001, longitude=-118.2, latitude=None, baro_altitude=8000,
+                last_contact=1001, longitude=-118.2, latitude=None, baro_altitude=8000.0,
                 on_ground="False", velocity=300.0, true_track=270.0, vertical_rate=0.5, timestamp=1609459200),
         ]
 
@@ -92,10 +92,10 @@ class TestDataCleaning:
         """Test that no rows are filtered when all coordinates are valid."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=1.0, timestamp=1609459200),
             Row(icao24="def456", callsign="AA100", origin_country="US", time_position=1000,
-                last_contact=1001, longitude=-74.0, latitude=40.7, baro_altitude=5000,
+                last_contact=1001, longitude=-74.0, latitude=40.7, baro_altitude=5000.0,
                 on_ground="True", velocity=200.0, true_track=90.0, vertical_rate=-2.0, timestamp=1609459200),
         ]
 
@@ -112,7 +112,7 @@ class TestVelocityConversion:
         """Test that velocity is correctly converted from m/s to km/h (multiply by 3.6)."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=100.0, true_track=180.0, vertical_rate=1.0, timestamp=1609459200),
         ]
 
@@ -126,7 +126,7 @@ class TestVelocityConversion:
         """Test velocity conversion with zero velocity."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="True", velocity=0.0, true_track=0.0, vertical_rate=0.0, timestamp=1609459200),
         ]
 
@@ -140,7 +140,7 @@ class TestVelocityConversion:
         """Test velocity conversion with high-speed aircraft."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=250.0, true_track=180.0, vertical_rate=1.0, timestamp=1609459200),
         ]
 
@@ -158,7 +158,7 @@ class TestFlightStatusDetermination:
         """Test that status is 'CLIMBING' when vertical_rate > 0.5."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=2.0, timestamp=1609459200),
         ]
 
@@ -176,7 +176,7 @@ class TestFlightStatusDetermination:
         """Test that status is 'DESCENDING' when vertical_rate < -0.5."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=-3.0, timestamp=1609459200),
         ]
 
@@ -194,7 +194,7 @@ class TestFlightStatusDetermination:
         """Test that status is 'CRUISING' when vertical_rate is between -0.5 and 0.5."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=0.2, timestamp=1609459200),
         ]
 
@@ -212,7 +212,7 @@ class TestFlightStatusDetermination:
         """Test that status is 'CRUISING' when vertical_rate is between -0.5 and 0.5."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=-0.3, timestamp=1609459200),
         ]
 
@@ -230,13 +230,13 @@ class TestFlightStatusDetermination:
         """Test status determination for multiple flights."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=450.0, true_track=180.0, vertical_rate=2.0, timestamp=1609459200),
             Row(icao24="def456", callsign="AA100", origin_country="US", time_position=1000,
-                last_contact=1001, longitude=-74.0, latitude=40.7, baro_altitude=8000,
+                last_contact=1001, longitude=-74.0, latitude=40.7, baro_altitude=8000.0,
                 on_ground="False", velocity=300.0, true_track=90.0, vertical_rate=-1.5, timestamp=1609459200),
             Row(icao24="ghi789", callsign="DL500", origin_country="US", time_position=1000,
-                last_contact=1001, longitude=-118.2, latitude=34.1, baro_altitude=5000,
+                last_contact=1001, longitude=-118.2, latitude=34.1, baro_altitude=5000.0,
                 on_ground="False", velocity=200.0, true_track=270.0, vertical_rate=0.0, timestamp=1609459200),
         ]
 
@@ -260,10 +260,10 @@ class TestEndToEndTransformation:
         """Test the full transformation: filter -> enrich -> status."""
         data = [
             Row(icao24="abc123", callsign="BA999", origin_country="UK", time_position=1000,
-                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000,
+                last_contact=1001, longitude=-1.5, latitude=51.5, baro_altitude=10000.0,
                 on_ground="False", velocity=100.0, true_track=180.0, vertical_rate=2.0, timestamp=1609459200),
             Row(icao24="def456", callsign="AA100", origin_country="US", time_position=1000,
-                last_contact=1001, longitude=None, latitude=40.7, baro_altitude=5000,
+                last_contact=1001, longitude=None, latitude=40.7, baro_altitude=5000.0,
                 on_ground="True", velocity=50.0, true_track=90.0, vertical_rate=0.0, timestamp=1609459200),
         ]
 
