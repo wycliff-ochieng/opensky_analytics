@@ -21,7 +21,9 @@ type Flight struct {
 	OriginCountry *string  `json:"origin_country,omitempty"`
 	Longitude     *float64 `json:"longitude,omitempty"`
 	Latitude      *float64 `json:"latitude,omitempty"`
+	BaroAltitude  *float64 `json:"baro_altitude,omitempty"`
 	VelocityKmh   *float64 `json:"velocity_kmh,omitempty"`
+	VerticalRate  *float64 `json:"vertical_rate,omitempty"`
 	Status        *string  `json:"status,omitempty"`
 	Timestamp     int64    `json:"timestamp"`
 }
@@ -153,7 +155,7 @@ func FlightsHandler(db *sql.DB) http.HandlerFunc {
 
 		queryStart := time.Now()
 		rows, err := db.Query(`
-			SELECT icao24, callsign, origin_country, longitude, latitude, velocity_kmh, status, timestamp
+			SELECT icao24, callsign, origin_country, longitude, latitude, baro_altitude, velocity_kmh, vertical_rate, status, timestamp
 			FROM flights_processed
 			ORDER BY timestamp DESC
 			LIMIT $1
@@ -176,7 +178,9 @@ func FlightsHandler(db *sql.DB) http.HandlerFunc {
 				&flight.OriginCountry,
 				&flight.Longitude,
 				&flight.Latitude,
+				&flight.BaroAltitude,
 				&flight.VelocityKmh,
+				&flight.VerticalRate,
 				&flight.Status,
 				&flight.Timestamp,
 			); err != nil {

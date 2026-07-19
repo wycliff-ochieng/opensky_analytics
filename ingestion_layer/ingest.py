@@ -2,7 +2,6 @@ import os
 import time
 import json
 import logging
-import threading
 
 import requests
 from kafka import KafkaProducer
